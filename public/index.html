@@ -1,132 +1,55 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Salle de Jeux — jeux multijoueur entre amis</title>
-  <meta name="description" content="20 jeux multijoueur gratuits à jouer entre amis, chacun sur son PC : cartes, plateau, stratégie, action, course.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+  <title>Salle de Jeux</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    { "imports": {
+      "three": "/vendor/three/build/three.module.js",
+      "three/addons/": "/vendor/three/examples/jsm/"
+    } }
+  </script>
 </head>
 <body>
-  <div class="bg-glow" aria-hidden="true"></div>
-
-  <header class="topbar">
-    <a href="/" class="logo"><span class="logo-mark">🎮</span> Salle<span class="grad">de</span>Jeux</a>
-    <div class="topbar-right">
-      <span id="online" class="pill"></span>
-      <span id="connection" class="status">Connexion…</span>
+  <!-- Accueil -->
+  <section id="home" class="screen">
+    <div class="card">
+      <h1>🎮 Salle de Jeux</h1>
+      <p class="sub">Jouez entre amis, en ligne, dans votre navigateur.</p>
+      <label>Votre pseudo <input id="name" maxlength="16" placeholder="Pseudo"></label>
+      <h2>Créer un salon</h2>
+      <div id="gameList" class="games"></div>
+      <h2>Rejoindre</h2>
+      <div class="row">
+        <input id="code" maxlength="4" placeholder="CODE" style="text-transform:uppercase">
+        <button id="joinBtn">Rejoindre</button>
+      </div>
+      <div id="roomList" class="rooms"></div>
     </div>
-  </header>
+  </section>
 
-  <!-- ================= ACCUEIL ================= -->
-  <main id="view-home" class="view">
-    <section class="hero">
-      <div class="hero-text">
-        <span class="eyebrow">20 jeux · 100 % gratuit · sans inscription</span>
-        <h1>Jouez ensemble,<br><span class="grad">chacun sur son PC.</span></h1>
-        <p>Cartes, plateau, stratégie, tir, course, aventure… Choisis un jeu, crée une partie et partage le code à tes amis.</p>
-      </div>
-
-      <div class="hero-card glass">
-        <label class="field-label" for="name">Ton pseudo</label>
-        <div class="identity">
-          <span id="avatar-preview" class="avatar">?</span>
-          <input id="name" maxlength="20" placeholder="Ex : Mathis">
-        </div>
-        <div class="swatches" id="swatches" aria-label="Couleur de l'avatar"></div>
-
-        <div class="divider"><span>Rejoindre une partie</span></div>
-        <form id="join-form" class="join">
-          <input id="join-code" maxlength="4" placeholder="CODE" autocomplete="off" aria-label="Code de la partie">
-          <button type="submit" class="btn">Rejoindre</button>
-        </form>
-      </div>
-    </section>
-
-    <section id="open-rooms-section" class="hidden">
-      <div class="section-head"><h2>🔥 Parties ouvertes</h2><span class="muted">Rejoins une partie qui attend des joueurs</span></div>
-      <div id="open-rooms" class="open-rooms"></div>
-    </section>
-
-    <section>
-      <div class="section-head">
-        <h2>Catalogue</h2>
-        <input id="search" class="search" placeholder="Rechercher un jeu…" aria-label="Rechercher un jeu">
-      </div>
-      <div id="filters" class="filters"></div>
-      <div id="catalog" class="catalog"></div>
-    </section>
-
-    <footer class="footer muted">Salle de Jeux — fait maison avec Node.js · Bon jeu !</footer>
-  </main>
-
-  <!-- ================= SALON / PARTIE ================= -->
-  <main id="view-room" class="view view-wide hidden">
-    <div class="room-banner glass" id="room-banner">
-      <div class="room-title">
-        <span id="room-icon" class="room-icon"></span>
-        <div>
-          <h2 id="room-game-name"></h2>
-          <p class="muted">Code : <strong id="room-code" class="code"></strong>
-            <button id="copy-link" class="btn small ghost">🔗 Copier le lien</button>
-            <button id="show-rules" class="btn small ghost">📖 Règles</button>
-          </p>
-        </div>
-      </div>
-      <div class="room-actions">
-        <button id="fullscreen" class="btn small ghost hidden">⛶ Plein écran</button>
-        <button id="stop-game" class="btn small ghost hidden">⏹ Terminer</button>
-        <button id="leave" class="btn small danger">Quitter</button>
+  <!-- Salon d'attente -->
+  <section id="lobby" class="screen hidden">
+    <div class="card">
+      <h1 id="lobbyGame"></h1>
+      <p class="sub">Code du salon : <b id="lobbyCode" class="code"></b> — partagez-le à vos amis</p>
+      <ul id="lobbyPlayers" class="players"></ul>
+      <p id="lobbyInfo" class="sub"></p>
+      <div class="row">
+        <button id="startBtn">Lancer la partie</button>
+        <button id="leaveBtn" class="ghost">Quitter</button>
       </div>
     </div>
+  </section>
 
-    <div class="room-layout">
-      <section class="room-main glass" id="room-main">
-        <div id="lobby" class="lobby">
-          <div class="lobby-art" id="lobby-art"></div>
-          <p id="lobby-text" class="lobby-text"></p>
-          <button id="start" class="btn big hidden">▶ Lancer la partie</button>
-        </div>
+  <!-- Jeu -->
+  <section id="game" class="screen hidden"></section>
 
-        <div id="game" class="hidden">
-          <p id="game-status" class="game-status"></p>
-          <div id="board"></div>
-          <div id="end-actions" class="end-actions hidden">
-            <button id="rematch" class="btn">🔁 Rejouer</button>
-            <button id="to-lobby" class="btn ghost">Retour au salon</button>
-          </div>
-        </div>
-      </section>
-
-      <aside class="room-side glass">
-        <h3>Joueurs <span id="player-count" class="muted"></span></h3>
-        <ul id="players" class="players"></ul>
-        <h3>Discussion</h3>
-        <div id="chat-log" class="chat-log"></div>
-        <form id="chat-form" class="chat-form">
-          <input id="chat-input" maxlength="200" placeholder="Écrire un message…" autocomplete="off">
-          <button type="submit" class="btn small">➤</button>
-        </form>
-      </aside>
-    </div>
-  </main>
-
-  <!-- Fenêtre des règles -->
-  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-box glass">
-      <button class="modal-close" id="modal-close" aria-label="Fermer">✕</button>
-      <div id="modal-content"></div>
-    </div>
-  </div>
-
-  <div id="toast" class="toast hidden"></div>
-
-  <script src="/games/_rt.js"></script>
-  <script src="/games/_shooter.js"></script>
-  <script src="/app.js"></script>
+  <div id="toast"></div>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

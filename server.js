@@ -1,394 +1,223 @@
-// =============================================================
-//  Serveur du site de jeux multijoueur
-//  - sert les pages du dossier public/
-//  - gère les salons et les parties via WebSocket (/ws)
-//  Aucune dépendance externe : seulement Node.js (version 18 ou plus)
-// =============================================================
-
+// =====================================================================
+//  Serveur de jeux multijoueur
+//  - sert les fichiers du dossier public/ (le site)
+//  - charge automatiquement chaque jeu du dossier games/
+//  - gère les salons (code à 4 lettres), les joueurs et le WebSocket
+//
+//  Interface d'un jeu côté serveur (games/monjeu.js) :
+//    module.exports = {
+//      id, name, minPlayers, maxPlayers,
+//      tickRate,             // (optionnel) nb de tick() par seconde
+//      joinInProgress,       // (optionnel) on peut rejoindre une partie lancée
+//      create(players, ctx)  -> état initial
+//      onJoin(state, player, ctx), onLeave(state, playerId, ctx)
+//      onAction(state, playerId, action, ctx)
+//      tick(state, dt, ctx)  // (optionnel)
+//      view(state, playerId) -> ce qu'on envoie à ce joueur
+//      staticData(state)     // (optionnel) données envoyées une seule fois
+//    }
+//  ctx.emit(event, toPlayerId?) envoie un évènement ponctuel (son, effet…)
+// =====================================================================
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3000;
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const PUBLIC = path.join(__dirname, 'public');
 
-// ---------- Chargement automatique des jeux (dossier games/) ----------
+// ---------- Chargement des jeux ----------
 const GAMES = {};
-for (const file of fs.readdirSync(path.join(__dirname, 'games'))) {
-  if (!file.endsWith('.js')) continue;
-  const game = require(path.join(__dirname, 'games', file));
-  GAMES[game.id] = game;
+for (const f of fs.readdirSync(path.join(__dirname, 'games'))) {
+  if (!f.endsWith('.js')) continue;
+  const g = require(path.join(__dirname, 'games', f));
+  GAMES[g.id] = g;
+  console.log(`Jeu chargé : ${g.name} (${g.id})`);
 }
-console.log('Jeux chargés :', Object.keys(GAMES).join(', '));
 
-// ---------- Serveur HTTP (fichiers statiques + API) ----------
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
+// ---------- Serveur HTTP statique ----------
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
 };
-
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, 'http://localhost');
-
-  // Liste des jeux pour la page d'accueil
-  if (url.pathname === '/api/games') {
-    const list = Object.values(GAMES)
-      .sort((a, b) => (a.order || 99) - (b.order || 99))
-      .map(g => ({
-        id: g.id, name: g.name, description: g.description, rules: g.rules || '',
-        category: g.category, icon: g.icon || '🎲', color: g.color || '#ffb547',
-        minPlayers: g.minPlayers, maxPlayers: g.maxPlayers, realtime: !!g.realtime,
-      }));
-    res.writeHead(200, { 'Content-Type': TYPES['.json'] });
-    return res.end(JSON.stringify(list));
-  }
-
-  // Parties publiques en attente de joueurs
-  if (url.pathname === '/api/rooms') {
-    const list = [...rooms.values()]
-      .filter(r => !r.started && !r.private && r.players.length < GAMES[r.gameId].maxPlayers)
-      .map(r => ({
-        code: r.code, game: r.gameId, players: r.players.length,
-        max: GAMES[r.gameId].maxPlayers, host: (r.players.find(p => p.id === r.hostId) || {}).name,
-      }));
-    res.writeHead(200, { 'Content-Type': TYPES['.json'], 'Cache-Control': 'no-store' });
-    const playing = [...rooms.values()].filter(r => r.started).length;
-    return res.end(JSON.stringify({ rooms: list, online: connections.size, playing }));
-  }
-
-  // Petit point de contrôle pour l'hébergeur
-  if (url.pathname === '/health') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    return res.end('ok');
-  }
-
-  // Fichiers statiques (protégés contre les chemins du type ../../)
-  let filePath = path.normalize(path.join(PUBLIC_DIR, decodeURIComponent(url.pathname)));
-  if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
-  if (url.pathname.endsWith('/')) filePath = path.join(filePath, 'index.html');
-
-  fs.readFile(filePath, (err, data) => {
-    if (err) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Page introuvable'); }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(filePath)] || 'application/octet-stream' });
+  let url = decodeURIComponent(req.url.split('?')[0]);
+  if (url === '/') url = '/index.html';
+  // Three.js (moteur 3D) servi depuis node_modules
+  let base = PUBLIC;
+  if (url.startsWith('/vendor/three/')) { base = path.join(__dirname, 'node_modules', 'three'); url = url.slice('/vendor/three'.length); }
+  const file = path.normalize(path.join(base, url));
+  if (!file.startsWith(base)) { res.writeHead(403); return res.end(); }
+  fs.readFile(file, (err, data) => {
+    if (err) { res.writeHead(404); return res.end('Introuvable'); }
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
     res.end(data);
   });
 });
 
-// ---------- WebSocket minimal (protocole RFC 6455) ----------
-const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-
-server.on('upgrade', (req, socket) => {
-  const key = req.headers['sec-websocket-key'];
-  if (!req.url.startsWith('/ws') || !key) { socket.destroy(); return; }
-  const accept = crypto.createHash('sha1').update(key + WS_GUID).digest('base64');
-  socket.write(
-    'HTTP/1.1 101 Switching Protocols\r\n' +
-    'Upgrade: websocket\r\nConnection: Upgrade\r\n' +
-    `Sec-WebSocket-Accept: ${accept}\r\n\r\n`
-  );
-  socket.setNoDelay(true);
-  onConnection(createConnection(socket));
-});
-
-function createConnection(socket) {
-  const conn = { socket, alive: true, open: true, onMessage: () => {}, onClose: () => {} };
-  let buffer = Buffer.alloc(0);
-  let fragments = [];
-
-  conn.send = (obj) => {
-    if (!conn.open) return;
-    // Les champs dont le nom commence par "_" restent secrets côté serveur
-    const text = JSON.stringify(obj, (k, v) => (k[0] === '_' ? undefined : v));
-    sendFrame(socket, 0x1, Buffer.from(text));
-  };
-  conn.close = () => {
-    if (!conn.open) return;
-    try { sendFrame(socket, 0x8, Buffer.alloc(0)); } catch (e) {}
-    socket.end();
-  };
-
-  socket.on('data', (chunk) => {
-    buffer = Buffer.concat([buffer, chunk]);
-    while (buffer.length >= 2) {
-      const fin = (buffer[0] & 0x80) !== 0;
-      const opcode = buffer[0] & 0x0f;
-      const masked = (buffer[1] & 0x80) !== 0;
-      let len = buffer[1] & 0x7f;
-      let offset = 2;
-      if (len === 126) { if (buffer.length < 4) return; len = buffer.readUInt16BE(2); offset = 4; }
-      else if (len === 127) { if (buffer.length < 10) return; len = Number(buffer.readBigUInt64BE(2)); offset = 10; }
-      if (len > 1024 * 1024) { socket.destroy(); return; } // message trop gros
-      const maskLen = masked ? 4 : 0;
-      if (buffer.length < offset + maskLen + len) return; // on attend la suite
-      let payload = buffer.subarray(offset + maskLen, offset + maskLen + len);
-      if (masked) {
-        const mask = buffer.subarray(offset, offset + 4);
-        payload = Buffer.from(payload.map((b, i) => b ^ mask[i % 4]));
-      }
-      buffer = buffer.subarray(offset + maskLen + len);
-
-      if (opcode === 0x8) { conn.close(); return; }                    // fermeture
-      if (opcode === 0x9) { sendFrame(socket, 0xA, payload); continue; } // ping -> pong
-      if (opcode === 0xA) { conn.alive = true; continue; }               // pong
-      if (opcode === 0x1 || opcode === 0x0) {                            // texte
-        fragments.push(payload);
-        if (fin) {
-          const text = Buffer.concat(fragments).toString('utf8');
-          fragments = [];
-          try { conn.onMessage(JSON.parse(text)); } catch (e) { /* message invalide ignoré */ }
-        }
-      }
-    }
-  });
-
-  const finish = () => { if (conn.open) { conn.open = false; conn.onClose(); } };
-  socket.on('close', finish);
-  socket.on('end', finish);
-  socket.on('error', finish);
-  return conn;
-}
-
-function sendFrame(socket, opcode, payload) {
-  const len = payload.length;
-  let header;
-  if (len < 126) header = Buffer.from([0x80 | opcode, len]);
-  else if (len < 65536) { header = Buffer.alloc(4); header[0] = 0x80 | opcode; header[1] = 126; header.writeUInt16BE(len, 2); }
-  else { header = Buffer.alloc(10); header[0] = 0x80 | opcode; header[1] = 127; header.writeBigUInt64BE(BigInt(len), 2); }
-  socket.write(Buffer.concat([header, payload]));
-}
-
-// Ping toutes les 25 s : détecte les joueurs déconnectés
-// et garde le serveur éveillé pendant une partie
-const connections = new Set();
-setInterval(() => {
-  for (const conn of connections) {
-    if (!conn.alive) { conn.socket.destroy(); continue; }
-    conn.alive = false;
-    try { sendFrame(conn.socket, 0x9, Buffer.alloc(0)); } catch (e) {}
-  }
-}, 25000);
-
-// ---------- Salons et parties ----------
-const rooms = new Map(); // code -> salon
+// ---------- Salons ----------
+const rooms = new Map(); // code -> room
+const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899',
+  '#84cc16', '#f43f5e', '#14b8a6', '#8b5cf6', '#facc15', '#fb923c', '#38bdf8', '#e879f9'];
 
 function makeCode() {
-  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // sans I ni O (confusion avec 1 et 0)
-  let code;
-  do { code = Array.from({ length: 4 }, () => letters[crypto.randomInt(letters.length)]).join(''); }
-  while (rooms.has(code));
-  return code;
+  const L = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let c;
+  do { c = Array.from({ length: 4 }, () => L[Math.floor(Math.random() * L.length)]).join(''); } while (rooms.has(c));
+  return c;
 }
 
-const PALETTE = ['#7c5cff', '#ff5da2', '#ffb547', '#3ecf7a', '#4da3ff', '#ff4d5e', '#2ed3c6', '#c58cff', '#ff8a3d', '#9be15d', '#f2f2f2', '#d4a373', '#00b4d8', '#e76f51', '#a3b18a', '#ffd6a5'];
-// Couleur choisie par le joueur, ou une autre si quelqu'un l'a déjà dans le salon
-function cleanColor(c, room) {
-  const taken = room ? room.players.map(p => p.color) : [];
-  if (/^#[0-9a-fA-F]{6}$/.test(String(c)) && !taken.includes(c)) return c;
-  return PALETTE.find(x => !taken.includes(x)) || '#7c5cff';
-}
-
-function cleanName(name) {
-  const n = String(name || '').trim().slice(0, 20);
-  return n || 'Joueur';
-}
+function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 
 function roomInfo(room) {
   return {
-    type: 'room',
-    code: room.code,
-    game: room.gameId,
-    hostId: room.hostId,
-    started: room.started,
-    players: room.players.map(p => ({ id: p.id, name: p.name, color: p.color, connected: !!p.conn })),
+    code: room.code, game: room.gameId, gameName: GAMES[room.gameId].name,
+    host: room.hostId, started: !!room.state,
+    min: GAMES[room.gameId].minPlayers, max: GAMES[room.gameId].maxPlayers,
+    players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, color: p.color })),
+  };
+}
+function broadcastRoom(room) { const info = roomInfo(room); for (const p of room.players.values()) send(p.ws, { t: 'room', room: info }); }
+
+function makeCtx(room) {
+  return {
+    emit(e, to) {
+      for (const p of room.players.values()) if (to === undefined || to === p.id) send(p.ws, { t: 'event', e });
+    },
+    now: () => Date.now(),
   };
 }
 
-function broadcast(room, msg) {
-  for (const p of room.players) if (p.conn) p.conn.send(msg);
-}
-
-// Chaque joueur reçoit sa propre "vue" de la partie :
-// certains jeux cachent des infos (cartes en main, bateaux adverses...)
-function viewFor(room, index) {
-  const game = GAMES[room.gameId];
-  return game.view ? game.view(room.state, index) : room.state;
-}
-
-function sendState(room) {
-  room.players.forEach((p, i) => {
-    if (p.conn) p.conn.send({ type: 'state', state: viewFor(room, i) });
-  });
-}
-
-function stopLoop(room) {
-  if (room.loop) { clearInterval(room.loop); room.loop = null; }
+function broadcastState(room) {
+  if (!room.state) return;
+  const g = GAMES[room.gameId];
+  for (const p of room.players.values()) {
+    try { send(p.ws, { t: 'state', s: g.view(room.state, p.id) }); } catch (e) { console.error(e); }
+  }
 }
 
 function startGame(room) {
-  const game = GAMES[room.gameId];
-  stopLoop(room);
-  room.state = game.setup(room.players.length, room.players.map(p => p.name));
-  room.started = true;
-  broadcast(room, roomInfo(room));
-  sendState(room);
-
-  // Jeux en temps réel : le serveur fait avancer la partie 30 fois par seconde
-  if (game.realtime) {
-    const TICK = 1 / 30;
-    const every = game.sendEvery || 1; // envoyer l'état tous les N ticks
-    let count = 0;
-    room.loop = setInterval(() => {
-      if (!room.state) return stopLoop(room);
-      try { game.tick(room.state, TICK); }
-      catch (e) { console.error('Erreur dans', game.id, e); }
-      if (++count % every === 0 || room.state.over) sendState(room);
-      if (room.state.over) stopLoop(room);
-    }, 1000 * TICK);
+  const g = GAMES[room.gameId];
+  room.ctx = makeCtx(room);
+  const players = [...room.players.values()].map(p => ({ id: p.id, name: p.name, color: p.color }));
+  room.state = g.create(players, room.ctx);
+  const stat = g.staticData ? g.staticData(room.state) : null;
+  for (const p of room.players.values()) send(p.ws, { t: 'start', game: room.gameId, static: stat });
+  broadcastRoom(room);
+  broadcastState(room);
+  if (g.tickRate) {
+    let last = Date.now();
+    room.timer = setInterval(() => {
+      const now = Date.now(); const dt = (now - last) / 1000; last = now;
+      try { g.tick(room.state, dt, room.ctx); } catch (e) { console.error(e); }
+      broadcastState(room);
+    }, 1000 / g.tickRate);
   }
 }
 
-function removePlayer(room, player) {
-  room.players = room.players.filter(p => p !== player);
-  if (room.players.length === 0) { stopLoop(room); rooms.delete(room.code); return; }
-  if (room.hostId === player.id) room.hostId = room.players[0].id;
-  if (room.started) {
-    // Un joueur quitte une partie en cours : la partie s'arrête
-    stopLoop(room);
-    room.started = false;
-    room.state = null;
-    broadcast(room, { type: 'info', message: `${player.name} a quitté la partie. Retour au salon.` });
+function leaveRoom(client) {
+  const room = client.room;
+  if (!room) return;
+  room.players.delete(client.id);
+  client.room = null;
+  if (room.players.size === 0) {
+    clearInterval(room.timer);
+    rooms.delete(room.code);
+    return;
   }
-  broadcast(room, roomInfo(room));
+  if (room.hostId === client.id) room.hostId = room.players.keys().next().value;
+  if (room.state) {
+    try { GAMES[room.gameId].onLeave(room.state, client.id, room.ctx); } catch (e) { console.error(e); }
+    broadcastState(room);
+  }
+  broadcastRoom(room);
 }
 
-function onConnection(conn) {
-  connections.add(conn);
-  let room = null;
-  let player = null;
-
-  const error = (message) => conn.send({ type: 'error', message });
-
-  const enter = (r, p) => {
-    room = r; player = p; p.conn = conn;
-    conn.send({ type: 'joined', code: r.code, you: p.id, token: p.token });
-    broadcast(r, roomInfo(r));
-    if (r.started) {
-      const game = GAMES[r.gameId];
-      const index = r.players.indexOf(p);
-      if (game.resync) game.resync(r.state, index); // renvoyer tout l'historique (dessins, blocs...)
-      conn.send({ type: 'state', state: viewFor(r, index) });
-    }
-  };
-
-  conn.onMessage = (msg) => {
-    if (!msg || typeof msg.type !== 'string') return;
-
-    switch (msg.type) {
+// ---------- WebSocket ----------
+const wss = new WebSocketServer({ server });
+wss.on('connection', ws => {
+  const client = { id: crypto.randomBytes(4).toString('hex'), name: 'Joueur', ws, room: null };
+  send(ws, { t: 'welcome', id: client.id, games: Object.values(GAMES).map(g => ({ id: g.id, name: g.name, min: g.minPlayers, max: g.maxPlayers, desc: g.description })) });
+  ws.on('message', raw => {
+    let m;
+    try { m = JSON.parse(raw); } catch { return; }
+    const err = msg => send(ws, { t: 'error', msg });
+    switch (m.t) {
+      case 'hello':
+        client.name = String(m.name || 'Joueur').replace(/[<>]/g, '').slice(0, 16) || 'Joueur';
+        break;
+      case 'list':
+        send(ws, { t: 'list', rooms: [...rooms.values()].filter(r => !r.state || GAMES[r.gameId].joinInProgress).map(roomInfo) });
+        break;
       case 'create': {
-        if (room) return error('Tu es déjà dans un salon.');
-        const game = GAMES[msg.game];
-        if (!game) return error('Jeu inconnu.');
-        const r = { code: makeCode(), gameId: game.id, players: [], hostId: null, started: false, state: null, private: !!msg.private, loop: null };
-        const p = { id: crypto.randomUUID(), token: crypto.randomUUID(), name: cleanName(msg.name), color: cleanColor(msg.color), conn: null };
-        r.players.push(p); r.hostId = p.id;
-        rooms.set(r.code, r);
-        enter(r, p);
+        if (!GAMES[m.game]) return err('Jeu inconnu');
+        leaveRoom(client);
+        const room = { code: makeCode(), gameId: m.game, hostId: client.id, players: new Map(), state: null };
+        rooms.set(room.code, room);
+        joinRoom(client, room);
         break;
       }
-
       case 'join': {
-        if (room) return error('Tu es déjà dans un salon.');
-        const r = rooms.get(String(msg.code || '').toUpperCase().trim());
-        if (!r) return error('Aucune partie avec ce code.');
-        if (r.started) return error('La partie a déjà commencé.');
-        if (r.players.length >= GAMES[r.gameId].maxPlayers) return error('Le salon est complet.');
-        const p = { id: crypto.randomUUID(), token: crypto.randomUUID(), name: cleanName(msg.name), color: cleanColor(msg.color, r), conn: null };
-        r.players.push(p);
-        enter(r, p);
+        const room = rooms.get(String(m.code || '').toUpperCase());
+        if (!room) return err('Salon introuvable');
+        const g = GAMES[room.gameId];
+        if (room.players.size >= g.maxPlayers) return err('Salon complet');
+        if (room.state && !g.joinInProgress) return err('La partie a déjà commencé');
+        leaveRoom(client);
+        joinRoom(client, room);
         break;
       }
-
-      case 'rejoin': { // après un rafraîchissement de page ou une coupure
-        if (room) return;
-        const r = rooms.get(String(msg.code || ''));
-        const p = r && r.players.find(x => x.token === msg.token);
-        if (!p) return conn.send({ type: 'rejoin-failed' });
-        if (p.conn && p.conn !== conn) p.conn.close();
-        clearTimeout(p.leaveTimer);
-        enter(r, p);
-        break;
-      }
-
       case 'start': {
-        if (!room || room.hostId !== player.id) return error("Seul l'hôte peut lancer la partie.");
-        const game = GAMES[room.gameId];
-        if (room.players.length < game.minPlayers) return error(`Il faut au moins ${game.minPlayers} joueurs.`);
+        const room = client.room;
+        if (!room || room.hostId !== client.id || room.state) return;
+        const g = GAMES[room.gameId];
+        if (room.players.size < g.minPlayers) return err(`Il faut au moins ${g.minPlayers} joueurs`);
         startGame(room);
         break;
       }
-
-      case 'move': {
-        if (!room || !room.started || !room.state) return;
-        const index = room.players.indexOf(player);
-        const game = GAMES[room.gameId];
-        let err;
-        try { err = game.move(room.state, index, msg.move || {}); }
-        catch (e) { console.error('Erreur dans', game.id, e); err = 'Action impossible.'; }
-        if (game.realtime) break; // l'état part au prochain "tick"
-        if (err) return error(err);
-        sendState(room);
+      case 'leave':
+        leaveRoom(client);
+        send(ws, { t: 'left' });
+        break;
+      case 'action': {
+        const room = client.room;
+        if (!room || !room.state || !m.a || typeof m.a !== 'object') return;
+        const g = GAMES[room.gameId];
+        let r;
+        try { r = g.onAction(room.state, client.id, m.a, room.ctx); } catch (e) { console.error(e); return; }
+        if (r && r.error) err(r.error);
+        // Les jeux "temps réel" diffusent l'état à chaque tick ; les autres à chaque action.
+        if (!g.tickRate || g.broadcastOnAction) broadcastState(room);
         break;
       }
-
-      case 'rematch': {
-        if (!room || room.hostId !== player.id) return;
-        startGame(room);
-        break;
-      }
-
-      case 'lobby': { // l'hôte ramène tout le monde au salon
-        if (!room || room.hostId !== player.id) return;
-        stopLoop(room);
-        room.started = false; room.state = null;
-        broadcast(room, roomInfo(room));
-        break;
-      }
-
       case 'chat': {
+        const room = client.room;
         if (!room) return;
-        const text = String(msg.text || '').trim().slice(0, 200);
-        if (text) broadcast(room, { type: 'chat', name: player.name, text });
-        break;
-      }
-
-      case 'leave': {
-        if (!room) return;
-        const r = room; const p = player;
-        room = null; player = null; p.conn = null;
-        removePlayer(r, p);
+        const text = String(m.text || '').slice(0, 200);
+        if (!text.trim()) return;
+        for (const p of room.players.values()) send(p.ws, { t: 'chat', from: client.name, color: client.color, text });
         break;
       }
     }
-  };
+  });
+  ws.on('close', () => leaveRoom(client));
+});
 
-  conn.onClose = () => {
-    connections.delete(conn);
-    if (!room || !player || player.conn !== conn) return;
-    const r = room; const p = player;
-    p.conn = null;
-    broadcast(r, roomInfo(r));
-    // On laisse 60 s au joueur pour revenir (rafraîchissement, coupure Wi-Fi...)
-    p.leaveTimer = setTimeout(() => { if (!p.conn && r.players.includes(p)) removePlayer(r, p); }, 60000);
-  };
+function joinRoom(client, room) {
+  const used = new Set([...room.players.values()].map(p => p.color));
+  client.color = COLORS.find(c => !used.has(c)) || COLORS[0];
+  room.players.set(client.id, client);
+  client.room = room;
+  broadcastRoom(room);
+  if (room.state) { // arrivée en cours de partie
+    const g = GAMES[room.gameId];
+    g.onJoin(room.state, { id: client.id, name: client.name, color: client.color }, room.ctx);
+    send(client.ws, { t: 'start', game: room.gameId, static: g.staticData ? g.staticData(room.state) : null });
+    broadcastState(room);
+  }
 }
 
-server.listen(PORT, () => {
-  console.log(`Serveur lancé sur http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`Serveur prêt : http://localhost:${PORT}`));
