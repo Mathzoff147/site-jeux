@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Salle de Jeux</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a href="/" class="logo">🎲 Salle de Jeux</a>
+    <span id="connection" class="status">Connexion…</span>
+  </header>
+
+  <!-- ===== Accueil ===== -->
+  <main id="view-home" class="view">
+    <section class="hero">
+      <h1>Joue avec tes amis, chacun sur son PC</h1>
+      <p>Choisis un jeu, crée une partie et partage le code. Pas de compte, pas d'installation.</p>
+      <div class="identity">
+        <label for="name">Ton pseudo</label>
+        <input id="name" maxlength="20" placeholder="Ex : Alex">
+      </div>
+      <form id="join-form" class="join">
+        <input id="join-code" maxlength="4" placeholder="CODE" autocomplete="off">
+        <button type="submit">Rejoindre</button>
+      </form>
+    </section>
+
+    <h2>Catalogue</h2>
+    <div id="filters" class="filters"></div>
+    <div id="catalog" class="catalog"></div>
+  </main>
+
+  <!-- ===== Salon + partie ===== -->
+  <main id="view-room" class="view hidden">
+    <div class="room-layout">
+      <section class="room-main">
+        <div class="room-head">
+          <div>
+            <h2 id="room-game-name"></h2>
+            <p class="muted">Code de la partie : <strong id="room-code" class="code"></strong>
+              <button id="copy-link" class="small ghost">Copier le lien</button></p>
+          </div>
+          <button id="leave" class="small ghost">Quitter</button>
+        </div>
+
+        <div id="lobby">
+          <p id="lobby-text" class="muted"></p>
+          <button id="start" class="hidden">Lancer la partie</button>
+        </div>
+
+        <div id="game" class="hidden">
+          <p id="game-status" class="game-status"></p>
+          <div id="board"></div>
+          <div id="end-actions" class="hidden">
+            <button id="rematch">Rejouer</button>
+            <button id="to-lobby" class="ghost">Retour au salon</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="room-side">
+        <h3>Joueurs</h3>
+        <ul id="players" class="players"></ul>
+        <h3>Discussion</h3>
+        <div id="chat-log" class="chat-log"></div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" maxlength="200" placeholder="Écrire un message…" autocomplete="off">
+          <button type="submit" class="small">Envoyer</button>
+        </form>
+      </aside>
+    </div>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Un fichier par jeu : ajoute ici la ligne de chaque nouveau jeu -->
+  <script src="/games/morpion.js"></script>
+  <script src="/games/puissance4.js"></script>
+  <script src="/games/conquete.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

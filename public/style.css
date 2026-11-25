@@ -1,0 +1,139 @@
+:root {
+  --bg: #0f1220;
+  --panel: #181c2f;
+  --panel-2: #20253d;
+  --text: #e9ecf8;
+  --muted: #9aa3c4;
+  --accent: #ffb547;
+  --accent-text: #1b1300;
+  --border: #2c3254;
+  --p0: #4da3ff;  /* couleur joueur 1 */
+  --p1: #ff5d6c;  /* couleur joueur 2 */
+  --p2: #4fd18b;  /* couleur joueur 3 */
+  --p3: #c58cff;  /* couleur joueur 4 */
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.5;
+}
+h1, h2, h3 { line-height: 1.2; margin: 0 0 .5em; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--panel);
+}
+.logo { color: var(--text); text-decoration: none; font-weight: 700; font-size: 1.15rem; }
+.status { font-size: .85rem; color: var(--muted); }
+.status.ok::before { content: "● "; color: #4fd18b; }
+.status.ko::before { content: "● "; color: #ff5d6c; }
+
+.view { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+
+button {
+  background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+  padding: 10px 18px; font-weight: 600; font-size: 1rem; cursor: pointer;
+}
+button:hover { filter: brightness(1.08); }
+button:disabled { opacity: .5; cursor: default; }
+button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+button.small { padding: 6px 12px; font-size: .85rem; }
+input {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; font-size: 1rem;
+}
+input:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Accueil */
+.hero {
+  background: linear-gradient(135deg, #1d2342, #261b3a); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 32px; margin-bottom: 32px;
+}
+.hero p { color: var(--muted); margin-top: 0; }
+.identity { display: flex; align-items: center; gap: 12px; margin: 20px 0 12px; }
+.join { display: flex; gap: 8px; }
+.join input { width: 110px; text-transform: uppercase; letter-spacing: .2em; text-align: center; }
+
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.filters button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+.filters button.active { background: var(--accent); color: var(--accent-text); }
+
+.catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; display: flex; flex-direction: column; gap: 8px;
+}
+.card .tag { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+.card p { margin: 0; color: var(--muted); flex: 1; }
+.card .meta { font-size: .85rem; color: var(--muted); }
+
+/* Salon */
+.room-layout { display: grid; grid-template-columns: 1fr 280px; gap: 20px; }
+@media (max-width: 800px) { .room-layout { grid-template-columns: 1fr; } }
+.room-main, .room-side {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;
+}
+.room-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.code { font-size: 1.3rem; letter-spacing: .2em; color: var(--accent); }
+.players { list-style: none; padding: 0; margin: 0 0 20px; }
+.players li { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.players .off { opacity: .45; }
+.chat-log {
+  height: 220px; overflow-y: auto; background: var(--panel-2); border-radius: 8px;
+  padding: 8px 10px; font-size: .9rem; margin-bottom: 8px;
+}
+.chat-log .sys { color: var(--muted); font-style: italic; }
+.chat-form { display: flex; gap: 6px; }
+.chat-form input { flex: 1; min-width: 0; padding: 6px 10px; font-size: .9rem; }
+
+.game-status { font-size: 1.1rem; font-weight: 600; min-height: 1.6em; }
+#end-actions { display: flex; gap: 10px; margin-top: 18px; }
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #2a1b22; border: 1px solid #ff5d6c; color: #ffd6db;
+  padding: 10px 18px; border-radius: 8px; z-index: 10;
+}
+
+/* ===== Jeux ===== */
+.p0 { color: var(--p0); } .p1 { color: var(--p1); } .p2 { color: var(--p2); } .p3 { color: var(--p3); }
+
+/* Morpion */
+.ttt { display: grid; grid-template-columns: repeat(3, 96px); gap: 8px; }
+.ttt button {
+  width: 96px; height: 96px; font-size: 3rem; background: var(--panel-2);
+  border: 1px solid var(--border); color: var(--text); padding: 0;
+}
+.ttt button.win { background: #3a3220; border-color: var(--accent); }
+
+/* Puissance 4 */
+.c4 { display: inline-grid; grid-template-columns: repeat(7, 52px); gap: 6px; background: #22306b; padding: 10px; border-radius: 12px; }
+.c4 .slot { width: 52px; height: 52px; border-radius: 50%; background: var(--bg); cursor: pointer; border: 0; padding: 0; }
+.c4 .slot.p0 { background: var(--p0); } .c4 .slot.p1 { background: #ffd447; }
+.c4 .slot.win { box-shadow: 0 0 0 4px #fff inset; }
+.c4 .slot.last { outline: 2px solid #fff; }
+
+/* Conquête */
+.cq-wrap { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.cq { display: grid; gap: 3px; }
+.cq .tile {
+  width: 48px; height: 48px; border-radius: 6px; border: 2px solid transparent; padding: 0;
+  font-weight: 700; font-size: .95rem; color: #fff; background: #2b304a; position: relative;
+}
+.cq .tile.neutral { background: #3a3f5c; color: #c3c8e0; }
+.cq .tile.mountain { background: #555a70; color: #aaa; cursor: default; }
+.cq .tile.o0 { background: #2a5d99; } .cq .tile.o1 { background: #9c3540; }
+.cq .tile.o2 { background: #2f7f55; } .cq .tile.o3 { background: #6f4b99; }
+.cq .tile.used { opacity: .6; }
+.cq .tile.selected { border-color: var(--accent); }
+.cq .tile.target { border-color: #fff; border-style: dashed; }
+.cq .tile .cap { position: absolute; top: 1px; left: 3px; font-size: .7rem; color: var(--accent); }
+.cq-side { flex: 1 1 200px; min-width: 200px; }
+.cq-side .row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.cq-log { color: var(--muted); font-size: .9rem; margin: 10px 0; }
+.cq-help { color: var(--muted); font-size: .85rem; }
