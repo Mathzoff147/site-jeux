@@ -4,8 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Salle de Jeux</title>
+  <meta name="description" content="Jouez entre amis en ligne, directement dans le navigateur : Empire Immobilier et Arène Néon.">
+  <meta name="theme-color" content="#0a0d1c">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script type="importmap">
     { "imports": {
@@ -15,41 +19,119 @@
   </script>
 </head>
 <body>
-  <!-- Accueil -->
-  <section id="home" class="screen">
-    <div class="card">
-      <h1>🎮 Salle de Jeux</h1>
-      <p class="sub">Jouez entre amis, en ligne, dans votre navigateur.</p>
-      <label>Votre pseudo <input id="name" maxlength="16" placeholder="Pseudo"></label>
-      <h2>Créer un salon</h2>
+  <div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <!-- Barre du haut -->
+  <header class="nav" id="nav">
+    <a class="brand" href="/" id="brand"><span class="logo">🎮</span><span>Salle de Jeux</span></a>
+    <div class="nav-right">
+      <span class="status" id="status" title="Connexion au serveur"><i></i><span>Connexion…</span></span>
+      <button class="profile" id="profileBtn" title="Modifier votre pseudo">
+        <span class="avatar" id="myAvatar"></span><span id="myName"></span><span class="edit">✎</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================== ACCUEIL ===================== -->
+  <main id="home" class="screen">
+    <section class="hero">
+      <div class="hero-text">
+        <span class="kicker">Gratuit · sans inscription · dans le navigateur</span>
+        <h1>Jouez entre amis,<br><span class="grad">en un clic.</span></h1>
+        <p>Créez un salon, envoyez le lien à vos amis, c'est parti. Aucun téléchargement.</p>
+      </div>
+      <form class="join-card" id="joinForm" autocomplete="off">
+        <label for="code">Vous avez un code ?</label>
+        <div class="code-input">
+          <input id="code" maxlength="4" placeholder="ABCD" spellcheck="false" inputmode="text" aria-label="Code du salon">
+          <button type="submit" class="btn primary" id="joinBtn">Rejoindre →</button>
+        </div>
+        <small>Le code à 4 lettres que votre ami vous a donné.</small>
+      </form>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><h2>Choisissez un jeu</h2></div>
       <div id="gameList" class="games"></div>
-      <h2>Rejoindre</h2>
-      <div class="row">
-        <input id="code" maxlength="4" placeholder="CODE" style="text-transform:uppercase">
-        <button id="joinBtn">Rejoindre</button>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Salons ouverts <span class="count" id="roomCount">0</span></h2>
+        <span class="muted live"><i></i> en direct</span>
       </div>
       <div id="roomList" class="rooms"></div>
-    </div>
-  </section>
+    </section>
 
-  <!-- Salon d'attente -->
-  <section id="lobby" class="screen hidden">
-    <div class="card">
-      <h1 id="lobbyGame"></h1>
-      <p class="sub">Code du salon : <b id="lobbyCode" class="code"></b> — partagez-le à vos amis</p>
-      <ul id="lobbyPlayers" class="players"></ul>
-      <p id="lobbyInfo" class="sub"></p>
-      <div class="row">
-        <button id="startBtn">Lancer la partie</button>
-        <button id="leaveBtn" class="ghost">Quitter</button>
-      </div>
-    </div>
-  </section>
+    <section class="section steps">
+      <div class="step"><b>1</b><div><h3>Créez un salon</h3><p>Choisissez un jeu ci-dessus.</p></div></div>
+      <div class="step"><b>2</b><div><h3>Invitez vos amis</h3><p>Copiez le lien ou le code et envoyez-le.</p></div></div>
+      <div class="step"><b>3</b><div><h3>Lancez la partie</h3><p>L'hôte démarre quand tout le monde est là.</p></div></div>
+    </section>
+    <footer class="foot">Salle de Jeux · fait avec ❤️ · <span id="online"></span></footer>
+  </main>
 
-  <!-- Jeu -->
+  <!-- ===================== SALON D'ATTENTE ===================== -->
+  <main id="lobby" class="screen hidden">
+    <button class="back" id="leaveBtn">← Quitter le salon</button>
+    <div class="lobby-grid">
+      <section class="panel lobby-main">
+        <div class="lobby-banner" id="lobbyBanner">
+          <div><span class="kicker">Salon d'attente</span><h1 id="lobbyGame"></h1></div>
+        </div>
+
+        <div class="invite">
+          <div class="code-box">
+            <span class="muted">Code du salon</span>
+            <div class="big-code" id="lobbyCode"></div>
+          </div>
+          <div class="invite-actions">
+            <button class="btn primary" id="copyLink">🔗 Copier le lien d'invitation</button>
+            <button class="btn ghost" id="copyCode">Copier le code</button>
+            <button class="btn ghost hidden" id="shareBtn">📤 Partager</button>
+          </div>
+        </div>
+
+        <div class="section-head"><h2>Joueurs <span class="count" id="playerCount"></span></h2></div>
+        <ul id="lobbyPlayers" class="players"></ul>
+
+        <div class="start-bar">
+          <p id="lobbyInfo"></p>
+          <button class="btn primary big" id="startBtn">▶ Lancer la partie</button>
+        </div>
+      </section>
+
+      <aside class="lobby-side">
+        <section class="panel">
+          <h3>Comment jouer</h3>
+          <div id="rules" class="rules"></div>
+        </section>
+        <section class="panel chat">
+          <h3>Discussion</h3>
+          <div class="chat-log" id="chatLog"><p class="muted empty">Dites bonjour 👋</p></div>
+          <form class="chat-form" id="chatForm" autocomplete="off">
+            <input id="chatInput" maxlength="200" placeholder="Écrire un message…">
+            <button class="btn primary" aria-label="Envoyer">➤</button>
+          </form>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <!-- ===================== JEU ===================== -->
   <section id="game" class="screen hidden"></section>
 
-  <div id="toast"></div>
+  <!-- Fenêtre pseudo -->
+  <dialog id="nameDialog">
+    <form method="dialog" id="nameForm">
+      <h2>Comment vous appelez-vous ?</h2>
+      <p class="muted">Ce pseudo sera visible par les autres joueurs.</p>
+      <input id="nameInput" maxlength="16" placeholder="Votre pseudo" required>
+      <div class="dlg-actions"><button class="btn primary big" value="ok">C'est parti</button></div>
+    </form>
+  </dialog>
+
+  <div id="toasts" aria-live="polite"></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>
