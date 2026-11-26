@@ -50,8 +50,12 @@
       </form>
     </section>
 
-    <section class="section">
-      <div class="section-head"><h2>Choisissez un jeu</h2></div>
+    <section class="section" id="catalog">
+      <div class="section-head wrap">
+        <h2>Choisissez un jeu <span class="count" id="gameCount"></span></h2>
+        <div class="search"><span>🔎</span><input id="search" placeholder="Rechercher un jeu…" autocomplete="off"></div>
+      </div>
+      <div class="chips" id="cats"></div>
       <div id="gameList" class="games"></div>
     </section>
 
@@ -94,6 +98,11 @@
 
         <div class="section-head"><h2>Joueurs <span class="count" id="playerCount"></span></h2></div>
         <ul id="lobbyPlayers" class="players"></ul>
+
+        <div id="settingsWrap" class="hidden">
+          <div class="section-head"><h2>Paramètres de la partie</h2><span class="muted" id="settingsNote"></span></div>
+          <div id="settings" class="settings"></div>
+        </div>
 
         <div class="start-bar">
           <p id="lobbyInfo"></p>

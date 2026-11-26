@@ -36,6 +36,30 @@ for (const f of fs.readdirSync(path.join(__dirname, 'games'))) {
   console.log(`Jeu chargé : ${g.name} (${g.id})`);
 }
 
+// Liste envoyée au navigateur (fiche de chaque jeu)
+const GAME_LIST = Object.values(GAMES).sort((a, b) => (a.order ?? 99) - (b.order ?? 99)).map(g => ({
+  id: g.id, name: g.name, desc: g.description, min: g.minPlayers, max: g.maxPlayers,
+  category: g.category || 'Autres', icon: g.icon || '🎮', color: g.color || '#7c6cff',
+  tags: g.tags || [], rules: g.rules || '', joinInProgress: !!g.joinInProgress,
+  settings: g.settings || [],
+}));
+
+// ---------- Paramètres réglables par l'hôte ----------
+// Dans un jeu : settings: [{ key, label, type: 'select'|'number'|'toggle', options: [{ v, l }], min, max, step, default, help }]
+function defaultSettings(g) { return Object.fromEntries((g.settings || []).map(o => [o.key, o.default])); }
+function cleanSettings(g, input, current) {
+  const out = { ...current };
+  for (const o of g.settings || []) {
+    if (!input || !(o.key in input)) continue;
+    let v = input[o.key];
+    if (o.type === 'toggle') v = !!v;
+    else if (o.type === 'number') { v = Number(v); if (!Number.isFinite(v)) continue; v = Math.min(o.max ?? Infinity, Math.max(o.min ?? -Infinity, v)); if (o.step) v = Math.round(v / o.step) * o.step; }
+    else if (o.type === 'select') { if (!o.options.some(x => String(x.v) === String(v))) continue; v = o.options.find(x => String(x.v) === String(v)).v; }
+    out[o.key] = v;
+  }
+  return out;
+}
+
 // ---------- Serveur HTTP statique ----------
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -77,6 +101,7 @@ function roomInfo(room) {
     code: room.code, game: room.gameId, gameName: GAMES[room.gameId].name,
     host: room.hostId, started: !!room.state,
     min: GAMES[room.gameId].minPlayers, max: GAMES[room.gameId].maxPlayers,
+    settings: room.settings,
     players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, color: p.color })),
   };
 }
@@ -103,7 +128,7 @@ function startGame(room) {
   const g = GAMES[room.gameId];
   room.ctx = makeCtx(room);
   const players = [...room.players.values()].map(p => ({ id: p.id, name: p.name, color: p.color }));
-  room.state = g.create(players, room.ctx);
+  room.state = g.create(players, room.ctx, { ...room.settings });
   const stat = g.staticData ? g.staticData(room.state) : null;
   for (const p of room.players.values()) send(p.ws, { t: 'start', game: room.gameId, static: stat });
   broadcastRoom(room);
@@ -140,7 +165,7 @@ function leaveRoom(client) {
 const wss = new WebSocketServer({ server });
 wss.on('connection', ws => {
   const client = { id: crypto.randomBytes(4).toString('hex'), name: 'Joueur', ws, room: null };
-  send(ws, { t: 'welcome', id: client.id, games: Object.values(GAMES).map(g => ({ id: g.id, name: g.name, min: g.minPlayers, max: g.maxPlayers, desc: g.description })) });
+  send(ws, { t: 'welcome', id: client.id, games: GAME_LIST });
   ws.on('message', raw => {
     let m;
     try { m = JSON.parse(raw); } catch { return; }
@@ -155,7 +180,7 @@ wss.on('connection', ws => {
       case 'create': {
         if (!GAMES[m.game]) return err('Jeu inconnu');
         leaveRoom(client);
-        const room = { code: makeCode(), gameId: m.game, hostId: client.id, players: new Map(), state: null };
+        const room = { code: makeCode(), gameId: m.game, hostId: client.id, players: new Map(), state: null, settings: defaultSettings(GAMES[m.game]) };
         rooms.set(room.code, room);
         joinRoom(client, room);
         break;
@@ -176,6 +201,20 @@ wss.on('connection', ws => {
         const g = GAMES[room.gameId];
         if (room.players.size < g.minPlayers) return err(`Il faut au moins ${g.minPlayers} joueurs`);
         startGame(room);
+        break;
+      }
+      case 'settings': {
+        const room = client.room;
+        if (!room || room.hostId !== client.id || room.state) return;
+        room.settings = cleanSettings(GAMES[room.gameId], m.settings, room.settings);
+        broadcastRoom(room);
+        break;
+      }
+      case 'lobby': { // l'hôte ramène tout le monde au salon (rejouer)
+        const room = client.room;
+        if (!room || room.hostId !== client.id || !room.state) return;
+        clearInterval(room.timer); room.timer = null; room.state = null;
+        broadcastRoom(room);
         break;
       }
       case 'leave':
