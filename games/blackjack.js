@@ -199,6 +199,10 @@ module.exports = {
     if (h.done) nextHand(s);
   },
 
+  results(s) {
+    if (!s.over) return null;
+    return { key: 'over', players: U.rank(s.players.map(p => ({ id: p.id, score: p.chips }))), records: s.players.map(p => ({ id: p.id, key: 'blackjack:chips', value: p.chips })) };
+  },
   view(s, id) {
     const c = s.phase === 'play' ? current(s) : null;
     const revealed = s.phase === 'reveal' ? Math.min(s.dealer.cards.length, 2 + Math.floor((Date.now() - (s.until - 900 - (s.dealer.cards.length - 2) * 700)) / 700)) : s.dealer.cards.length;
