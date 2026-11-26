@@ -85,7 +85,7 @@ function publicUser(u, full) {
   if (!u) return null;
   const lv = levelOf(u.xp), clan = u.clan_id ? q('SELECT id, name, tag, emblem FROM clans WHERE id = ?').get(u.clan_id) : null;
   const eq = J(u.equipped, {});
-  const out = { id: u.id, name: u.name, bio: u.bio, avatar: J(u.avatar, {}), level: lv.level, xp: u.xp, xpCur: lv.cur, xpNext: lv.next, games: u.games, wins: u.wins,
+  const out = { id: u.id, name: u.name, role: u.role || 'user', bio: u.bio, avatar: J(u.avatar, {}), level: lv.level, xp: u.xp, xpCur: lv.cur, xpNext: lv.next, games: u.games, wins: u.wins,
     rating: u.rating, peak: u.peak, rank: rankOf(u.rating), rated: u.rated, clan, title: eq.title ? C.ITEM[eq.title]?.name : null, nameColor: eq.namecolor ? C.ITEM[eq.namecolor]?.value : null,
     frame: eq.frame ? C.ITEM[eq.frame]?.value : null, color: C.ITEM[eq.color]?.value || null, created: u.created, lastSeen: u.last_seen, playtime: u.playtime, favorites: J(u.favorites, []) };
   if (full) Object.assign(out, { coins: u.coins, owned: J(u.owned, []), equipped: eq, streak: u.streak, dailyReady: u.last_daily !== today() });
@@ -366,6 +366,6 @@ function ticket(uid, a) {
 function seen(uid) { q('UPDATE users SET last_seen = ? WHERE id = ?').run(now(), uid); }
 function stats() { return { users: q('SELECT COUNT(*) n FROM users').get().n, games: q('SELECT COALESCE(SUM(played),0) n FROM game_counts').get().n }; }
 
-module.exports = { register, login, logout, byToken, me, userRow, checkSeason, profile, updateProfile, toggleFavorite, claimDaily, buy, equip, dailyChallenges, claimChallenge,
+module.exports = { db, register, login, logout, byToken, me, userRow, checkSeason, profile, updateProfile, toggleFavorite, claimDaily, buy, equip, dailyChallenges, claimChallenge,
   recordResults, saveRecord, leaderboards, tournaments, friendList, addFriend, answerFriend, removeFriend, areFriends, sendDm, conversation, clanInfo, createClan, joinClan, leaveClan, clanSay, clanList,
   searchUsers, popularity, ticket, seen, stats, publicUser, levelOf, rankOf, seasonId };

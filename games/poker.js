@@ -207,6 +207,10 @@ module.exports = {
     ctx.emit({ type: 'act', kind: a.type });
   },
 
+  results(s) {
+    if (s.phase !== 'over') return null;
+    return { key: 'over', players: U.rank(s.players.map(p => ({ id: p.id, score: p.chips, win: p.id === s.winner }))), records: s.players.map(p => ({ id: p.id, key: 'poker:chips', value: p.chips })) };
+  },
   view(s, id) {
     const reveal = s.phase === 'showdown' || s.phase === 'over';
     const me = s.players.find(p => p.id === id);

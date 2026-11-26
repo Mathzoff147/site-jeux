@@ -1,13 +1,17 @@
 {
   "name": "salle-de-jeux-multijoueur",
   "version": "1.0.0",
-  "description": "Site de jeux multijoueur : Empire Immobilier (plateau) et Arène Néon (FPS 3D)",
+  "description": "Salle de Jeux : 17 jeux multijoueur, comptes, progression, classements, tournois",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "admin": "node admin.js"
   },
   "dependencies": {
     "three": "^0.160.0",
     "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }

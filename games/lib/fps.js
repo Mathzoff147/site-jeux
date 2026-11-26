@@ -133,7 +133,7 @@ module.exports = function makeFps(cfg) {
   function endMatch(s, ctx) {
     if (s.phase === 'end' || s.phase === 'over') return;
     if (teams) { s.phase = 'over'; s.over = true; s.winnerTeam = s.score[0] > s.score[1] ? 0 : 1; ctx.emit({ type: 'matchEnd', winnerTeam: s.winnerTeam }); return; }
-    s.phase = 'end'; s.restartAt = Date.now() + 12000;
+    s.phase = 'end'; s.restartAt = Date.now() + 12000; s.matchNo = (s.matchNo || 0) + 1;
     const ranking = s.players.slice().sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
     s.winner = ranking[0]?.id || null;
     ctx.emit({ type: 'matchEnd', winner: s.winner });
@@ -385,6 +385,13 @@ module.exports = function makeFps(cfg) {
       s.walls = s.walls.filter(w => w.until > now);
     },
 
+    results(s) {
+      const key = teams ? (s.over ? 'over' : null) : (s.phase === 'end' ? 'm' + s.matchNo : null);
+      if (!key) return null;
+      const players = teams ? s.players.map(p => ({ id: p.id, place: p.team === s.winnerTeam ? 1 : 2, win: p.team === s.winnerTeam, score: `${p.kills}/${p.deaths}` }))
+        : U.rank(s.players.map(p => ({ id: p.id, score: p.kills, win: p.id === s.winner })));
+      return { key, players, records: s.players.map(p => ({ id: p.id, key: (cfg.id) + ':kills', value: p.kills })) };
+    },
     view(s, id) {
       const me = s.players.find(p => p.id === id), now = Date.now();
       const left = teams ? Math.max(0, (s.phaseEnd || 0) - now) : Math.max(0, (s.phase === 'play' ? s.endsAt : s.restartAt) - now);

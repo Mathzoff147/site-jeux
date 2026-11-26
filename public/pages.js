@@ -1,4 +1,5 @@
 // =====================================================================
+import { adminPage } from './admin-page.js';
 //  Pages du site : Accueil, Jeux, Nouveautés, Classement, Tournois,
 //  Boutique, Amis (messages, clans), Profil, Actualités, Aide.
 // =====================================================================
@@ -20,7 +21,8 @@ export function avatarHTML(u, size = 40) {
   const inner = emoji ? `<span style="font-size:${size * 0.56}px;line-height:1">${emoji}</span>` : `<b style="font-size:${size * 0.42}px">${esc((u?.name || '?')[0])}</b>`;
   return `<span class="uav" style="width:${size}px;height:${size}px;${frame && frame !== 'none' ? `background:${frame};padding:${Math.max(2, size / 14)}px` : ''}"><span style="background:${bg}">${inner}</span></span>`;
 }
-export function nameHTML(u) { return `${u.clanTag || u.clan?.tag ? `<span class="ctag">[${esc(u.clanTag || u.clan.tag)}]</span> ` : ''}<b style="${u.nameColor ? `color:${u.nameColor}` : ''}">${esc(u.name)}</b>`; }
+const ROLE_BADGE = { admin: '<span class="rbadge admin" title="Administrateur">🛡️ Admin</span>', mod: '<span class="rbadge mod" title="Modérateur">🔨 Modo</span>' };
+export function nameHTML(u) { return (ROLE_BADGE[u.role] || '') + `${u.clanTag || u.clan?.tag ? `<span class="ctag">[${esc(u.clanTag || u.clan.tag)}]</span> ` : ''}<b style="${u.nameColor ? `color:${u.nameColor}` : ''}">${esc(u.name)}</b>`; }
 const ago = t => { const s = (Date.now() - t) / 1000; if (s < 60) return 'à l’instant'; if (s < 3600) return `il y a ${Math.floor(s / 60)} min`; if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`; return `il y a ${Math.floor(s / 86400)} j`; };
 const dateFr = d => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 const left = ms => { const s = Math.max(0, ms / 1000); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return d ? `${d} j ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
@@ -44,7 +46,9 @@ function wire(el, hub) {
 }
 
 // ---------------- Cartes de jeux ----------------
+const visibleGames = hub => hub.games.filter(g => !g.disabled || ['admin'].includes(hub.me?.role));
 function gameCard(g, hub, extra = '') {
+  if (g.disabled) extra += '<span class="newb" style="background:#475569">DÉSACTIVÉ</span>';
   const em = ART[g.id] || [g.icon], fav = hub.me?.favorites?.includes(g.id);
   const live = hub.rooms.filter(r => r.game === g.id).reduce((n, r) => n + r.players.length, 0);
   return `<article class="game-card">
@@ -93,8 +97,8 @@ const PAGES = {
   async accueil(el, _, hub, alive) {
     const home = await hub.api('home').catch(() => ({ stats: {}, popularity: {}, news: [], tournaments: [], top: [] }));
     if (!alive()) return;
-    const pop = hub.games.slice().sort((a, b) => (home.popularity[b.id] || 0) - (home.popularity[a.id] || 0)).slice(0, 4);
-    const fresh = NEW.slice(0, 4).map(([id]) => hub.games.find(g => g.id === id)).filter(Boolean);
+    const pop = visibleGames(hub).slice().sort((a, b) => (home.popularity[b.id] || 0) - (home.popularity[a.id] || 0)).slice(0, 4);
+    const fresh = NEW.slice(0, 4).map(([id]) => visibleGames(hub).find(g => g.id === id)).filter(Boolean);
     const favs = (hub.me?.favorites || []).map(id => hub.games.find(g => g.id === id)).filter(Boolean);
     el.innerHTML = `
       <section class="hero">
@@ -139,7 +143,7 @@ const PAGES = {
       el.querySelector('#cats').innerHTML = cats.map(c => `<button class="chip ${c === cat ? 'on' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
       el.querySelectorAll('[data-cat]').forEach(b => { b.onclick = () => { cat = b.dataset.cat; draw(); }; });
       const n = s => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
-      const list = hub.games.filter(g => (cat === 'Tous' || g.category === cat || (cat === '⭐ Favoris' && hub.me?.favorites?.includes(g.id))) && (!search || n(`${g.name} ${g.desc} ${g.category}`).includes(n(search))));
+      const list = visibleGames(hub).filter(g => (cat === 'Tous' || g.category === cat || (cat === '⭐ Favoris' && hub.me?.favorites?.includes(g.id))) && (!search || n(`${g.name} ${g.desc} ${g.category}`).includes(n(search))));
       el.querySelector('#gameList').innerHTML = list.map(g => gameCard(g, hub)).join('') || '<div class="empty-rooms"><b>Aucun jeu trouvé</b>Essayez un autre mot.</div>';
       wire(el.querySelector('#gameList'), hub);
     };
@@ -357,6 +361,7 @@ const PAGES = {
   },
 };
 PAGES.profile = PAGES.profil;
+PAGES.admin = (el, param, hub, alive) => adminPage(el, param, hub, alive);
 
 function fmtRec(r) {
   if (r.key.startsWith('kart:time:')) { const s = r.value; return `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`; }

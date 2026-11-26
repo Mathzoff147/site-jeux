@@ -537,6 +537,10 @@ module.exports = {
     }
   },
 
+  results(s) {
+    if (!s.over) return null;
+    return { key: 'over', players: s.players.map(p => ({ id: p.id, place: 1, win: !!s.win, score: `Vague ${s.wave} · ${p.kills} tués` })), records: s.players.map(p => ({ id: p.id, key: 'zombie:wave', value: s.wave })) };
+  },
   view(s, id) {
     const me = s.players.find(p => p.id === id);
     const cyc = s.light === 'day' ? 0 : s.light === 'night' ? 1 : (Math.sin(s.time / 240 * Math.PI * 2 - Math.PI / 2) + 1) / 2;

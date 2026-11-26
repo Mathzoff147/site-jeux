@@ -183,6 +183,11 @@ module.exports = {
     }
   },
 
+  results(s) {
+    if (!s.over) return null;
+    return { key: 'over', players: s.karts.map(k => ({ id: k.id, place: k.place, win: k.place === 1, score: k.time ? k.time.toFixed(2) + ' s' : 'abandon' })),
+      records: s.karts.filter(k => k.time).map(k => ({ id: k.id, key: 'kart:time:' + s.track.key, value: Math.round(k.time * 100) / 100 })) };
+  },
   view(s, id) {
     return {
       phase: s.phase, timer: Math.ceil(s.timer), t: s.start != null ? s.time - s.start : 0, laps: s.laps, over: s.over,

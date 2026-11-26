@@ -201,6 +201,10 @@ module.exports = {
     }
   },
 
+  results(s) {
+    if (s.phase !== 'over') return null;
+    return { key: 'over', players: U.rank(s.players.filter(p => !p.out).map(p => ({ id: p.id, score: s.target ? p.score : -p.hand.length, win: p.id === s.winner }))) };
+  },
   view(s, id) {
     return {
       phase: s.phase, turn: s.turn, dir: s.dir, color: s.color, top: s.discard[s.discard.length - 1], pending: s.pending,

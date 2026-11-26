@@ -80,4 +80,10 @@ const U = {
     return { x, y };
   },
 };
+// Classement générique pour la fin de partie : list = [{ id, score, win? }]
+U.rank = (list, desc = true) => {
+  const sorted = list.slice().sort((a, b) => (b.win ? 1 : 0) - (a.win ? 1 : 0) || (desc ? b.score - a.score : a.score - b.score));
+  let place = 0, prev;
+  return sorted.map((p, i) => { if (i === 0 || p.score !== prev || p.win) place = i + 1; prev = p.score; return { ...p, place, win: !!p.win || (place === 1 && p.win === undefined) }; });
+};
 module.exports = U;

@@ -1,3 +1,4 @@
+const U = require('./lib/util');
 // =====================================================================
 //  EMPIRE IMMOBILIER — règles (serveur)
 //  Jeu de plateau d'achat/vente de propriétés, 2 à 8 joueurs.
@@ -594,6 +595,11 @@ module.exports = {
     }
   },
 
+  results(s) {
+    if (s.phase !== 'over') return null;
+    return { key: 'over', players: U.rank(s.players.map(p => ({ id: p.id, score: p.bankrupt ? -1 : worth(s, p), win: p.id === s.winner }))),
+      records: s.players.filter(p => !p.bankrupt).map(p => ({ id: p.id, key: 'empire:worth', value: worth(s, p) })) };
+  },
   view(s) {
     // On n'envoie pas l'ordre des cartes (secret).
     const { decks, board, ...rest } = s;

@@ -141,6 +141,11 @@ module.exports = {
     }
   },
 
+  results(s) {
+    if (s.phase !== 'over') return null;
+    const top = Math.max(...s.players.map(p => p.score));
+    return { key: 'over', players: U.rank(s.players.filter(p => !p.gone).map(p => ({ id: p.id, score: p.score, win: p.score === top }))), records: s.players.map(p => ({ id: p.id, key: 'impostor:score', value: p.score })) };
+  },
   view(s, id) {
     const me = s.players.find(p => p.id === id);
     const showAll = s.phase === 'result' || s.phase === 'over' || s.phase === 'guess';

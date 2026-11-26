@@ -42,6 +42,8 @@ function showNotifs(list) {
     if (n.type === 'record') toast(`📈 Nouveau record ! <b>${esc(n.label)}</b> : ${esc(n.value)}`, 'gold', true, 7000);
     if (n.type === 'friend') toast(`👋 <b>${esc(n.name)}</b> vous demande en ami <button class="btn primary small" data-go="#/amis">Voir</button>`, '', true, 9000);
     if (n.type === 'friendOk') toast(`🤝 <b>${esc(n.name)}</b> est maintenant votre ami !`, 'ok', true);
+    if (n.type === 'gift') toast(`🎁 Cadeau de l’administration : ${[n.coins ? `+${n.coins} 🪙` : '', n.xp ? `+${n.xp} XP` : '', n.item ? esc(n.item) : ''].filter(Boolean).join(' · ')}`, 'gold', true, 8000);
+    if (n.type === 'muted') toast(`🔇 Vous êtes en sourdine jusqu’à ${new Date(n.until).toLocaleTimeString('fr-FR')}`, 'err', true, 8000);
     if (n.type === 'season') toast(`🏅 Nouvelle saison ! Récompense du rang <b>${esc(n.rank)}</b> : +${n.coins} 🪙`, 'gold', true, 9000);
   }
   document.querySelectorAll('#toasts [data-go]').forEach(b => { b.onclick = () => { location.hash = b.dataset.go; }; });
@@ -70,10 +72,13 @@ function callApi(m, a) {
   });
 }
 function setMe(u) {
+  const prev = hub.me;
   hub.me = u;
+  if ((prev?.id !== u?.id || prev?.role !== u?.role) && hub.games.length && !game && !$('#pages').classList.contains('hidden')) setTimeout(route);
   const box = $('#profileBtn');
   $('#loginBtn').classList.toggle('hidden', !!u || !!guestName);
   $('#coins').classList.toggle('hidden', !u);
+  $('#adminLink').classList.toggle('hidden', !(u && (u.role === 'admin' || u.role === 'mod')));
   if (u) { $('#coins b').textContent = u.coins; $('#myName').innerHTML = `${esc(u.name)} <small>Nv ${u.level}</small>`; $('#myAvatar').innerHTML = avatarHTML(u, 30); box.classList.remove('hidden'); }
   else if (guestName) { $('#myName').innerHTML = `${esc(guestName)} <small>invité</small>`; $('#myAvatar').innerHTML = avatarHTML({ name: guestName }, 30); box.classList.remove('hidden'); }
   else box.classList.add('hidden');
@@ -162,6 +167,13 @@ function connect() {
       case 'clan': hub.emit('clan', m.msg); break;
       case 'presence': hub.emit('presence', m); if (hub.friends) { const f = hub.friends.friends.find(x => x.id === m.id); if (f) { f.online = m.on; renderInviteList(); } } break;
       case 'voice': voice.onSignal(m); break;
+      case 'games': hub.games = m.games; if (hub.page === 'jeux' || hub.page === 'accueil' || hub.page === 'admin') route(); break;
+      case 'announce': {
+        const b = $('#announce'); b.classList.toggle('hidden', !m.a);
+        if (m.a) { b.className = `announce ${m.a.kind || 'info'}`; b.innerHTML = `📢 ${esc(m.a.text)} <button aria-label="Fermer">✕</button>`; b.querySelector('button').onclick = () => b.classList.add('hidden'); }
+        break;
+      }
+      case 'kicked': localStorage.removeItem('token'); setMe(null); toast(`⛔ ${m.msg}`, 'err', false, 10000); break;
     }
   };
 }

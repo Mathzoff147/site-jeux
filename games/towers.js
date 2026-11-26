@@ -233,6 +233,10 @@ module.exports = {
     s.enemies = s.enemies.filter(e => e.hp > 0);
   },
 
+  results(s) {
+    if (!s.over) return null;
+    return { key: 'over', players: s.players.map(p => ({ id: p.id, place: 1, win: !!s.win, score: `Vague ${s.wave}` })), records: s.players.map(p => ({ id: p.id, key: 'towers:wave', value: s.win ? s.wave : s.wave - 1 })) };
+  },
   view(s) {
     return {
       map: s.map, wave: s.wave, goal: s.goal, lives: s.lives, maxLives: s.maxLives, phase: s.phase, timer: Math.ceil(s.timer), speed: s.speed, over: s.over, win: s.win, shared: s.shared, difficulty: s.difficulty,

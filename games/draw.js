@@ -130,6 +130,10 @@ module.exports = {
     }
   },
 
+  results(s) {
+    if (s.phase !== 'over') return null;
+    return { key: 'over', players: U.rank(s.players.filter(p => !p.gone).map(p => ({ id: p.id, score: p.score }))), records: s.players.map(p => ({ id: p.id, key: 'draw:score', value: p.score })) };
+  },
   view(s, id) {
     const me = s.players.find(p => p.id === id);
     const isDrawer = s.drawer === id;

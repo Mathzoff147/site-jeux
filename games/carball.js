@@ -152,6 +152,12 @@ module.exports = {
     if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy) * 0.8; } if (b.y > H - b.r) { b.y = H - b.r; b.vy = -Math.abs(b.vy) * 0.8; }
   },
 
+  results(s) {
+    if (!s.over) return null;
+    const win = s.score[0] > s.score[1] ? 0 : 1;
+    return { key: 'over', players: s.cars.map(c => ({ id: c.id, place: c.team === win ? 1 : 2, win: c.team === win, score: `${s.score[c.team]}–${s.score[1 - c.team]}` })),
+      records: s.cars.map(c => ({ id: c.id, key: 'carball:goals', value: c.goals || 0 })) };
+  },
   view(s) {
     return {
       phase: s.phase, timer: U.r1(s.timer), time: Math.ceil(s.time), overtime: s.overtime, score: s.score, over: s.over,

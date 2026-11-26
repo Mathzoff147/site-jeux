@@ -180,7 +180,7 @@ module.exports = {
         // pas dans un joueur
         if (b !== 17 && s.players.some(q => x + 1 > q.x - 0.3 && x < q.x + 0.3 && z + 1 > q.z - 0.3 && z < q.z + 0.3 && y + 1 > q.y && y < q.y + 1.8)) return;
         if (s.mode === 'survie') { if (!p.inv[b]) return { error: 'Vous n’avez pas ce bloc' }; if (--p.inv[b] <= 0) delete p.inv[b]; }
-        s.W[i] = b; s.edits++;
+        s.W[i] = b; s.edits++; p.placed = (p.placed || 0) + 1;
         ctx.emit({ type: 'set', x, y, z, b, old: 0 });
         return;
       }
@@ -195,6 +195,7 @@ module.exports = {
   },
   tick(s, dt) { s.time += dt; for (const p of s.players) if (s.mode === 'survie' && p.hp < 20 && Math.random() < dt * 0.2) p.hp++; },
 
+  records(s) { return s.players.filter(p => p.placed).map(p => ({ id: p.id, key: 'blocks:placed', value: p.placed })); },
   view(s, id) {
     const me = s.players.find(p => p.id === id);
     return {

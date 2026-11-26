@@ -296,6 +296,7 @@ module.exports = {
     s.shots = s.shots.filter(p => p.life > 0);
   },
 
+  records(s) { return s.players.map(h => ({ id: h.id, key: 'quest:level', value: h.lvl })); },
   view(s, id) {
     const me = s.players.find(p => p.id === id);
     const cx = me?.x ?? 640, cy = me?.y ?? 1500;

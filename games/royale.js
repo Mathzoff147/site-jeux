@@ -284,6 +284,11 @@ module.exports = {
     s.items = s.items.filter(i => !i.taken);
   },
 
+  results(s) {
+    if (!s.over) return null;
+    return { key: 'over', players: s.players.map(p => ({ id: p.id, place: p.place || s.players.length, win: p.id === s.winner, score: `#${p.place} · ${p.kills} élim.` })),
+      records: s.players.map(p => ({ id: p.id, key: 'royale:kills', value: p.kills })) };
+  },
   view(s, id) {
     const me = s.players.find(p => p.id === id);
     const zc = zoneAt(s), z = s.zone;

@@ -176,6 +176,10 @@ module.exports = {
     }
   },
 
+  results(s) {
+    if (!s.over) return null;
+    return { key: 'over', players: U.rank(s.racers.filter(r => !r.left).map(r => ({ id: r.id, score: r.wins, win: r.id === s.winner }))) };
+  },
   view(s, id) {
     const C = s.course;
     return {

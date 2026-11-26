@@ -197,6 +197,11 @@ module.exports = {
     }
   },
 
+  results(s) {
+    if (s.phase !== 'over') return null;
+    const draw = s.result === '½-½', w = s.result === '1-0';
+    return { key: 'over', players: [{ id: s.white.id, place: draw || w ? 1 : 2, win: !draw && w, score: s.result }, { id: s.black.id, place: draw || !w ? 1 : 2, win: !draw && !w, score: s.result }] };
+  },
   view(s, id) {
     const side = s.white.id === id ? 'w' : s.black.id === id ? 'b' : null;
     let clock = null;
