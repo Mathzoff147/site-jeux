@@ -50,6 +50,9 @@ function promoteByName(name, role = 'admin') {
   const r = q('UPDATE users SET role = ? WHERE name = ?').run(role, String(name));
   return r.changes > 0;
 }
+// les pseudos listés dans ADMINS deviennent administrateurs (au démarrage ET à la connexion)
+const adminNames = () => String(process.env.ADMINS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+function promoteIfListed(uid) { const u = q('SELECT name, role FROM users WHERE id = ?').get(uid); if (u && u.role !== 'admin' && adminNames().includes(u.name.toLowerCase())) q("UPDATE users SET role = 'admin' WHERE id = ?").run(uid); }
 function autoPromote() { for (const n of String(process.env.ADMINS || '').split(',').map(s => s.trim()).filter(Boolean)) promoteByName(n, 'admin'); }
 
 function userDetail(id) {
@@ -209,4 +212,4 @@ function api(uid, m, a, ctx) {
 }
 const news = () => q('SELECT * FROM news ORDER BY at DESC, id DESC').all();
 
-module.exports = { api, roleOf, can, banInfo, isMuted, disabledGames, announcement, promoteByName, autoPromote, news, ROLE_NAMES };
+module.exports = { promoteIfListed, api, roleOf, can, banInfo, isMuted, disabledGames, announcement, promoteByName, autoPromote, news, ROLE_NAMES };

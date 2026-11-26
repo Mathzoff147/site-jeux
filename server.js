@@ -213,6 +213,7 @@ wss.on('connection', ws => {
         const ban = uid && A.banInfo(uid);
         if (ban) { send(ws, { t: 'kicked', msg: `Compte suspendu : ${ban.reason}` }); uid = null; }
         if (uid) {
+          A.promoteIfListed(uid);
           setUser(client, uid);
           const season = P.checkSeason(P.userRow(uid));
           send(ws, { t: 'me', user: P.me(uid), token: m.token });
@@ -349,6 +350,7 @@ function api(client, m, a) {
   switch (m) {
     case 'register': case 'login': {
       const r = m === 'register' ? P.register(a.name, a.pass) : P.login(a.name, a.pass);
+      A.promoteIfListed(r.user.id);
       const ban = A.banInfo(r.user.id);
       if (ban) { P.logout(r.token); throw new Error(`Compte suspendu${ban.until ? ` jusqu’au ${new Date(ban.until).toLocaleString('fr-FR')}` : ''} : ${ban.reason}`); }
       setUser(client, r.user.id);
@@ -439,4 +441,4 @@ function voiceLeave(client) {
 }
 function broadcastVoice(room) { const list = [...room.voice]; for (const p of room.players.values()) send(p.ws, { t: 'voice', a: 'members', ids: list }); }
 
-server.listen(PORT, () => console.log(`Serveur prêt : http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Serveur prêt : http://localhost:${PORT} · données : ${P.DIR}`));

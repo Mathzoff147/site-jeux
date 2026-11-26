@@ -10,7 +10,8 @@ const fs = require('fs');
 const path = require('path');
 const C = require('./content');
 
-const DIR = path.join(__dirname, '..', 'data');
+// dossier des données : DATA_DIR (ex. disque persistant Render /var/data) ou ./data
+const DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 fs.mkdirSync(DIR, { recursive: true });
 const db = new DatabaseSync(path.join(DIR, 'salle.db'));
 db.exec(`
@@ -366,6 +367,6 @@ function ticket(uid, a) {
 function seen(uid) { q('UPDATE users SET last_seen = ? WHERE id = ?').run(now(), uid); }
 function stats() { return { users: q('SELECT COUNT(*) n FROM users').get().n, games: q('SELECT COALESCE(SUM(played),0) n FROM game_counts').get().n }; }
 
-module.exports = { db, register, login, logout, byToken, me, userRow, checkSeason, profile, updateProfile, toggleFavorite, claimDaily, buy, equip, dailyChallenges, claimChallenge,
+module.exports = { db, DIR, register, login, logout, byToken, me, userRow, checkSeason, profile, updateProfile, toggleFavorite, claimDaily, buy, equip, dailyChallenges, claimChallenge,
   recordResults, saveRecord, leaderboards, tournaments, friendList, addFriend, answerFriend, removeFriend, areFriends, sendDm, conversation, clanInfo, createClan, joinClan, leaveClan, clanSay, clanList,
   searchUsers, popularity, ticket, seen, stats, publicUser, levelOf, rankOf, seasonId };
